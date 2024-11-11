@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "obsidian-article-catalogue"
+version = "0.1"
+description = "Generate an article catalogue for obsidian from your .bib file."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE.txt"}
+keywords = ["obsidian", "article", "catalogue", "bib", "latex"]
+authors = [{name = "Max"}]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+]
+dependencies = [
+    "black",
+    "isort",
+    "pillow",
+    "pdf2image",
+    "pybtex",
+]
+
+[project.optional-dependencies]
+dev = ["check-manifest"]
+test = ["coverage"]
+[project.urls]
+"Source" = "https://github.com/max-models/obsidian-article-catalogue"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+obscat-pdfparse = "obscat.pdf2img:main"
+obscat-catalogue = "obscat.catalogue:main"
