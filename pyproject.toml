@@ -20,6 +20,7 @@ dependencies = [
     "pillow",
     "pdf2image",
     "pybtex",
+    "pymupdf",
 ]
 
 [project.optional-dependencies]
@@ -34,3 +35,5 @@ where = ["src"]
 [project.scripts]
 obscat-pdfparse = "obscat.pdf2img:main"
 obscat-catalogue = "obscat.catalogue:main"
+obscat-add-article = "obscat.articles:add"
+obscat-set-dirs = "obscat.state:main"

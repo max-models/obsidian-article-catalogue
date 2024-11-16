@@ -3,7 +3,7 @@ import glob
 import argparse
 from PIL import Image
 from pdf2image import convert_from_path
-
+from obscat.state import load_state_file
 
 def save_frontpage(pdf_path, overwrite=False):
     output_file = f"{pdf_path}_frontpage.jpg"
@@ -64,9 +64,17 @@ def process_pdfs(input_dir, overwrite=False):
 
 
 def main():
+    state_file = load_state_file()
+    article_folder_path = state_file['article_folder_path']
+    bib_file_path = state_file['bib_file_path']
+
     parser = argparse.ArgumentParser(description="Convert PDFs to images.")
     parser.add_argument(
-        "-i", "--input", required=True, help="Input directory containing PDFs.",
+        "-i",
+        "--input",
+        required=False if article_folder_path else True,
+        default=article_folder_path,
+        help="Input directory containing PDFs.",
     )
     parser.add_argument(
         "--overwrite",

@@ -3,6 +3,7 @@ import argparse
 from urllib.parse import unquote
 import pybtex.database.input.bibtex
 
+from obscat.state import load_state_file
 
 def latextitle2mdtitle(text):
     text = text.replace("\\hspace", " ")
@@ -161,19 +162,25 @@ def write_article_md(entries, output_dir, full_path=False):
 
 
 def main():
+    state_file = load_state_file()
+    article_folder_path = state_file['article_folder_path']
+    bib_file_path = state_file['bib_file_path']
+    
     parser = argparse.ArgumentParser(
         description="Process BibTeX files and generate markdown files.",
     )
     parser.add_argument(
         "-i",
         "--input",
-        required=True,
+        required=False if article_folder_path else True,
+        default=bib_file_path,
         help="Input BibTeX file.",
     )
     parser.add_argument(
         "-o",
         "--output",
-        required=True,
+        required=False if article_folder_path else True,
+        default=article_folder_path,
         help="Output directory.",
     )
     parser.add_argument(

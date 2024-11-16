@@ -166,3 +166,11 @@ cython_debug/
 
 # Hidden files
 .DS_Store
+
+
+# State
+*state.yml
+
+
+# Files
+*.pdf
