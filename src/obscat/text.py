@@ -1,8 +1,22 @@
 """Turn BibTeX/LaTeX strings into text that is safe to use in Obsidian."""
 
-from pylatexenc.latex2text import LatexNodes2Text
+from pylatexenc.latex2text import (
+    LatexNodes2Text,
+    MacroTextSpec,
+    get_default_latex_context_db,
+)
 
-_LATEX = LatexNodes2Text()
+# pylatexenc drops macros it doesn't know, which would turn "The {\TeX}book"
+# into "The book".
+_CONTEXT = get_default_latex_context_db()
+_CONTEXT.add_context_category(
+    "obscat",
+    macros=[
+        MacroTextSpec("TeX", simplify_repl="TeX"),
+        MacroTextSpec("LaTeX", simplify_repl="LaTeX"),
+    ],
+)
+_LATEX = LatexNodes2Text(latex_context=_CONTEXT)
 
 # Characters Obsidian does not allow in note names or links.
 _FORBIDDEN_FILENAME_CHARS = set('*"\\/<>:|?#^[]')

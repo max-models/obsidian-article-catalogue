@@ -28,7 +28,7 @@ def test_build_uses_config(bib_file, articles_dir, capsys):
     main(["config", "-b", str(bib_file), "-a", str(articles_dir)])
     assert main(["build"]) == 0
     assert (articles_dir / "doe2020gyro" / "@doe2020gyro.md").exists()
-    assert "Wrote 3 notes" in capsys.readouterr().out
+    assert "Wrote 4 notes" in capsys.readouterr().out
 
 
 def test_build_with_explicit_paths(bib_file, articles_dir):

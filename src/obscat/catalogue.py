@@ -1,6 +1,6 @@
-"""Generate one Obsidian note per article from a BibTeX file.
+"""Generate one Obsidian note per entry of a BibTeX file.
 
-For every article in the .bib file a folder ``<articles>/<key>/`` is created with:
+For every entry in the .bib file a folder ``<articles>/<key>/`` is created with:
 
 - ``@<key>.md``: the note for the article. Its body is written once and then
   left alone, so you can write your notes in it. On every build only the
@@ -28,7 +28,6 @@ from obscat.layout import Layout
 from obscat.pdfs import pdf_markdown, pdf_property
 from obscat.text import latex_to_text, month_number, safe_filename
 
-ARTICLE_TYPES = ("article", "inproceedings")
 BASE_FILE = "Articles.base"
 
 # Properties that are set from the .bib file on every build, in this order.
@@ -42,6 +41,7 @@ MANAGED_PROPERTIES = (
     "doi",
     "url",
     "citekey",
+    "type",
     "pdf",
     "has_pdf",
 )
@@ -55,6 +55,8 @@ properties:
     displayName: Note
   note.title:
     displayName: Title
+  note.type:
+    displayName: Type
   note.authors:
     displayName: Authors
   note.year:
@@ -73,6 +75,7 @@ views:
     order:
       - file.name
       - title
+      - type
       - authors
       - year
       - journal
@@ -115,13 +118,6 @@ def is_preprint(entry):
     return "arxiv" in " ".join(entry.fields.get(f, "") for f in fields).lower()
 
 
-def is_catalogued(entry):
-    """Articles, conference papers and preprints are catalogued; books etc. are not."""
-    return entry.type in ARTICLE_TYPES or (
-        entry.type in ("misc", "unpublished") and is_preprint(entry)
-    )
-
-
 def read_bib(bib_path):
     """Return all entries of a .bib file.
 
@@ -136,12 +132,6 @@ def read_bib(bib_path):
     for problem in problems:
         print(f"Warning: {bib_path.name}: {problem}", file=sys.stderr)
     return data.entries
-
-
-def load_entries(bib_path):
-    """Return the catalogued entries of a .bib file, keyed by citation key."""
-    entries = read_bib(bib_path)
-    return {key: entry for key, entry in entries.items() if is_catalogued(entry)}
 
 
 def entry_title(entry):
@@ -192,6 +182,7 @@ def entry_properties(key, entry, layout):
         "doi": entry.fields.get("doi") or None,
         "url": entry_url(entry),
         "citekey": key,
+        "type": entry.type,
         "pdf": pdf_property(layout, key) if has_pdf else None,
         "has_pdf": has_pdf,
     }
@@ -275,7 +266,8 @@ def _remove_legacy_notes(folder, key, keep):
             path.read_text(encoding="utf-8", errors="replace")
         )
         legacy = match and _LEGACY_NOTE_RE.search(match.group(1))
-        if legacy and legacy.group(1) == key:
+        # BibTeX keys are case-insensitive.
+        if legacy and legacy.group(1).lower() == key.lower():
             path.unlink()
 
 
@@ -348,7 +340,7 @@ def build_catalogue(bib_path, output_dir, full_path=False, pdf_dir=None):
     PDFs are looked for in ``pdf_dir`` if given, otherwise in the vault. Returns the
     catalogued entries and the keys of the entries without a PDF.
     """
-    entries = load_entries(bib_path)
+    entries = read_bib(bib_path)
     layout = Layout(output_dir, pdf_dir)
     output_dir = layout.articles_dir
     output_dir.mkdir(parents=True, exist_ok=True)

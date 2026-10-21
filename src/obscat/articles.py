@@ -2,11 +2,13 @@
 
 import re
 import shutil
+import sys
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+import pybtex.errors
 import pymupdf
 from pybtex.database import BibliographyData, parse_string
 
@@ -68,7 +70,10 @@ def fetch_bibtex(doi=None, arxiv=None):
 
 def parse_single_entry(bibtex):
     """Parse BibTeX text with exactly one entry and return ``(key, entry)``."""
-    entries = parse_string(bibtex, bib_format="bibtex").entries
+    with pybtex.errors.capture() as problems:
+        entries = parse_string(bibtex, bib_format="bibtex").entries
+    for problem in problems:
+        print(f"Warning: {problem}", file=sys.stderr)
     if len(entries) != 1:
         raise ObscatError(f"Expected exactly one BibTeX entry, got {len(entries)}")
     return next(iter(entries.items()))

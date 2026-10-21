@@ -81,7 +81,7 @@ def test_add_with_bibtex(tmp_path, bib_file, articles_dir, make_pdf):
     assert pdf.exists()
     entries = parse_file(str(bib_file)).entries
     assert list(entries)[-1] == "New_2023"
-    assert len(entries) == 5
+    assert len(entries) == 5  # 4 sample entries + the new one
 
 
 def test_add_keeps_existing_bib_text(tmp_path, bib_file, articles_dir, make_pdf):
@@ -172,3 +172,9 @@ def test_add_to_external_pdf_folder(tmp_path, bib_file, articles_dir, make_pdf):
     )
     assert (papers / f"{key}.pdf").exists()
     assert not articles_dir.exists()
+
+
+def test_parse_single_entry_tolerates_unknown_month(capsys):
+    key, entry = parse_single_entry("@article{k, title={T}, month=June, year=2016}")
+    assert key == "k"
+    assert "undefined string" in capsys.readouterr().err

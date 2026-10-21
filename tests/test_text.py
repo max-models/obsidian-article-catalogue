@@ -11,6 +11,7 @@ from obscat.text import latex_to_text, month_number, safe_filename
         (r"A \textendash{} B", "A – B"),
         (r"Ber\hspace{0.167em}nd", "Bernd"),
         ("  lots   of\n space ", "lots of space"),
+        (r"The {\TeX}book and \LaTeX", "The TeXbook and LaTeX"),
     ],
 )
 def test_latex_to_text(latex, text):

@@ -17,7 +17,7 @@ dependencies = [
     "pillow",
     "platformdirs",
     "pybtex>=0.25",
-    "pylatexenc>=2.10",
+    "pylatexenc>=2.10,<3",
     "pymupdf>=1.24.3",
     "pyyaml",
 ]

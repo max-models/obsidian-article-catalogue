@@ -2,7 +2,7 @@
 
 Generate an article catalogue for [Obsidian](https://obsidian.md) from your `.bib` file.
 
-For every article in the bibliography you get a note `@<citekey>.md` with the
+For every entry in the bibliography you get a note `@<citekey>.md` with the
 metadata as [properties](https://obsidian.md/help/properties) (title, authors,
 year, journal, DOI, ...), an embedded preview of the first pages, the PDF and the
 BibTeX entry. The PDFs can live in the vault or in a folder outside it (e.g. a
@@ -106,8 +106,8 @@ obscat images --overwrite     # re-render the previews at the smaller size
 PDF folder. Previews used to be rendered at 150 dpi (about 3.5 MB per paper) and
 with an extra front page image; `obscat images` deletes those front page images.
 
-`@article` and `@inproceedings` entries are catalogued, as well as arXiv preprints
-(`@misc` with `archivePrefix = {arXiv}`).
+Every entry of the .bib file gets a note: articles, preprints, books, theses,
+reports, ... (the `type` property says which).
 
 ### Notes
 
@@ -115,7 +115,7 @@ Link to an article with `[[@key]]`; typing its title also finds it, because the
 title is added as an alias. The note body is only written when the note is
 created. On every `obscat build` the properties that come from the .bib file
 (`title`, `aliases`, `authors`, `year`, `month`, `journal`, `doi`, `url`,
-`citekey`, `pdf`, `has_pdf`) are updated, and everything else is kept: the body, your
+`citekey`, `type`, `pdf`, `has_pdf`) are updated, and everything else is kept: the body, your
 own properties (e.g. `status`, `tags`) and your own aliases.
 
 Authors are links (`[[Jane Doe]]`), so creating a note for an author lists all
