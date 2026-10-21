@@ -129,7 +129,23 @@ def test_has_pdf(bib_file, articles_dir):
     (articles_dir / "doe2020gyro" / "doe2020gyro.pdf").write_bytes(b"%PDF")
     _, missing = build_catalogue(bib_file, articles_dir)
     assert missing == ["smith2019conf", "lee2021arxiv"]
-    assert read_note(articles_dir, "doe2020gyro")[0]["has_pdf"] is True
+    properties = read_note(articles_dir, "doe2020gyro")[0]
+    assert properties["has_pdf"] is True
+    assert properties["pdf"] == "[[doe2020gyro.pdf]]"
+    assert "pdf" not in read_note(articles_dir, "smith2019conf")[0]
+
+
+def test_external_pdf_folder(tmp_path, bib_file, articles_dir, make_pdf):
+    papers = tmp_path / "papers"
+    make_pdf(papers / "doe2020gyro.pdf")
+    _, missing = build_catalogue(bib_file, articles_dir, pdf_dir=papers)
+    assert missing == ["smith2019conf", "lee2021arxiv"]
+    properties, body = read_note(articles_dir, "doe2020gyro")
+    uri = (papers / "doe2020gyro.pdf").as_uri()
+    assert properties["pdf"] == uri
+    assert f"[Open PDF]({uri})" in body
+    assert "![[doe2020gyro.pdf]]" not in body
+    assert "![[doe2020gyro.pdf.jpg]]" in body
 
 
 def test_invalid_user_properties_are_not_overwritten(bib_file, articles_dir):

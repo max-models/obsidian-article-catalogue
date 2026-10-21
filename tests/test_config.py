@@ -6,7 +6,9 @@ from obscat.config import config_path, load_config, save_config
 
 def test_missing_config_gives_empty_values(isolated_config):
     assert not isolated_config.exists()
-    assert load_config() == {"bib_file_path": None, "article_folder_path": None}
+    assert load_config() == dict.fromkeys(
+        ["bib_file_path", "article_folder_path", "pdf_folder_path"]
+    )
 
 
 def test_env_variable_selects_config(isolated_config):
@@ -29,6 +31,7 @@ def test_partial_update_keeps_other_values(tmp_path):
     assert load_config() == {
         "bib_file_path": str(tmp_path / "refs.bib"),
         "article_folder_path": str(tmp_path / "articles"),
+        "pdf_folder_path": None,
     }
 
 
@@ -43,7 +46,7 @@ def test_incomplete_config_fills_missing_keys(isolated_config, content):
     isolated_config.parent.mkdir(parents=True)
     isolated_config.write_text(content)
     config = load_config()
-    assert set(config) == {"bib_file_path", "article_folder_path"}
+    assert set(config) == {"bib_file_path", "article_folder_path", "pdf_folder_path"}
     assert config["article_folder_path"] is None
 
 

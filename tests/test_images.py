@@ -1,13 +1,13 @@
 from PIL import Image
 
 from obscat.images import (
-    collage_path,
-    frontpage_path,
     make_collage,
-    process_pdfs,
+    remove_frontpages,
+    render_collages,
     render_pages,
-    save_pdf_images,
+    save_collage,
 )
+from obscat.layout import Layout
 
 
 def test_render_pages(tmp_path, make_pdf):
@@ -27,46 +27,70 @@ def test_make_collage_grid():
     assert collage.getpixel((5, 25)) == (0, 0, 0)
 
 
-def test_save_pdf_images(tmp_path, make_pdf):
+def test_save_collage(tmp_path, make_pdf):
     pdf = make_pdf(tmp_path / "key.pdf", pages=5)
-    written = save_pdf_images(pdf, dpi=72)
-    assert written == [tmp_path / "key.pdf.jpg", tmp_path / "key.pdf_frontpage.jpg"]
-    with Image.open(collage_path(pdf)) as collage:
-        assert collage.size == (800, 600)
-    with Image.open(frontpage_path(pdf)) as frontpage:
-        assert frontpage.size == (200, 300)
+    collage = tmp_path / "vault" / "key.pdf.jpg"
+    assert save_collage(pdf, collage, dpi=72)
+    with Image.open(collage) as image:
+        assert image.size == (800, 600)
+
+
+def test_default_resolution_is_small(tmp_path, make_pdf):
+    pdf = make_pdf(tmp_path / "key.pdf", pages=1)
+    save_collage(pdf, tmp_path / "key.pdf.jpg")
+    with Image.open(tmp_path / "key.pdf.jpg") as image:
+        # 200x300 pt pages at 50 dpi
+        assert image.size == (4 * 139, 209)
 
 
 def test_collage_is_limited_to_16_pages(tmp_path, make_pdf):
     pdf = make_pdf(tmp_path / "long.pdf", pages=20)
-    save_pdf_images(pdf, dpi=72)
-    with Image.open(collage_path(pdf)) as collage:
-        assert collage.size == (800, 1200)
+    save_collage(pdf, tmp_path / "long.pdf.jpg", dpi=72)
+    with Image.open(tmp_path / "long.pdf.jpg") as image:
+        assert image.size == (800, 1200)
 
 
-def test_existing_images_are_skipped_unless_overwrite(tmp_path, make_pdf):
+def test_existing_collage_is_skipped_unless_overwrite(tmp_path, make_pdf):
     pdf = make_pdf(tmp_path / "key.pdf")
-    save_pdf_images(pdf, dpi=72)
-    assert save_pdf_images(pdf, dpi=72) == []
-    assert len(save_pdf_images(pdf, overwrite=True, dpi=72)) == 2
+    collage = tmp_path / "key.pdf.jpg"
+    assert save_collage(pdf, collage, dpi=72)
+    assert not save_collage(pdf, collage, dpi=72)
+    assert save_collage(pdf, collage, overwrite=True, dpi=72)
 
 
-def test_only_missing_image_is_rendered(tmp_path, make_pdf):
-    pdf = make_pdf(tmp_path / "key.pdf")
-    save_pdf_images(pdf, dpi=72)
-    frontpage_path(pdf).unlink()
-    assert save_pdf_images(pdf, dpi=72) == [frontpage_path(pdf)]
+def test_render_collages_in_vault(articles_dir, make_pdf, capsys):
+    layout = Layout(articles_dir)
+    good = make_pdf(layout.pdf("good"))
+    layout.folder("broken").mkdir(parents=True)
+    layout.pdf("broken").write_bytes(b"not a pdf")
+    make_pdf(layout.folder("good") / "other.pdf")  # not <key>.pdf, ignored
 
+    rendered, failed = render_collages(layout, dpi=72)
 
-def test_process_pdfs_recurses_and_survives_broken_pdfs(tmp_path, make_pdf, capsys):
-    good = make_pdf(tmp_path / "a" / "a.pdf")
-    broken = tmp_path / "b" / "b.pdf"
-    broken.parent.mkdir()
-    broken.write_bytes(b"not a pdf")
-
-    rendered, failed = process_pdfs(tmp_path, dpi=72)
-
-    assert rendered == [good]
-    assert failed == [broken]
+    assert rendered == ["good"]
+    assert failed == ["broken"]
     assert "Error processing" in capsys.readouterr().err
-    assert collage_path(good).exists()
+    assert layout.collage("good").exists()
+    assert good.exists()
+
+
+def test_render_collages_with_external_pdfs(tmp_path, articles_dir, make_pdf):
+    layout = Layout(articles_dir, tmp_path / "papers")
+    make_pdf(layout.pdf("a"))
+    make_pdf(layout.pdf("no_note"))
+    layout.folder("a").mkdir(parents=True)
+
+    rendered, failed = render_collages(layout, dpi=72)
+
+    assert rendered == ["a"]
+    assert failed == []
+    assert layout.collage("a").exists()
+    assert not layout.folder("no_note").exists()
+
+
+def test_remove_frontpages(articles_dir):
+    (articles_dir / "a").mkdir(parents=True)
+    (articles_dir / "a" / "a.pdf_frontpage.jpg").write_bytes(b"jpg")
+    (articles_dir / "a" / "a.pdf.jpg").write_bytes(b"jpg")
+    assert remove_frontpages(Layout(articles_dir)) == 1
+    assert (articles_dir / "a" / "a.pdf.jpg").exists()

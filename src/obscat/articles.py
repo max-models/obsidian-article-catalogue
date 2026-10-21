@@ -11,6 +11,7 @@ import pymupdf
 from pybtex.database import BibliographyData, parse_file, parse_string
 
 from obscat import ObscatError
+from obscat.layout import Layout
 
 # Crossref's recommended pattern, see https://www.crossref.org/blog/dois-and-matching-regular-expressions/
 DOI_RE = re.compile(r"\b10\.\d{4,9}/[-._;()/:a-z0-9]+", re.IGNORECASE)
@@ -96,13 +97,15 @@ def add_article(
     arxiv=None,
     key=None,
     move=False,
+    pdf_dir=None,
 ):
     """Add a PDF to the catalogue and return its citation key.
 
     The BibTeX entry is taken from ``bibtex`` if given, otherwise downloaded using
     ``doi`` or ``arxiv``, otherwise downloaded using an identifier found in the PDF.
     The entry is appended to ``bib_path`` (optionally under a different ``key``) and
-    the PDF is copied (or moved) to ``<articles_dir>/<key>/<key>.pdf``.
+    the PDF is copied (or moved) to ``<pdf_dir>/<key>.pdf`` if ``pdf_dir`` is given,
+    otherwise to ``<articles_dir>/<key>/<key>.pdf``.
     """
     pdf_path, bib_path = Path(pdf_path), Path(bib_path)
     if not pdf_path.is_file():
@@ -129,7 +132,7 @@ def add_article(
                     f"{bib_path} already contains this DOI as {other_key}"
                 )
 
-    target = Path(articles_dir) / key / f"{key}.pdf"
+    target = Layout(articles_dir, pdf_dir).pdf(key)
     if target.exists():
         raise ObscatError(f"{target} already exists")
 

@@ -1,9 +1,7 @@
-"""Render preview images for article PDFs.
+"""Render a preview collage of the first pages of each article's PDF.
 
-For ``<key>.pdf`` two images are written next to it:
-
-- ``<key>.pdf.jpg``: a collage of the first pages (embedded in the generated note),
-- ``<key>.pdf_frontpage.jpg``: the first page.
+The collage is written to ``<articles>/<key>/<key>.pdf.jpg`` in the vault (also
+when the PDF itself lives outside the vault) and embedded in the note.
 """
 
 import sys
@@ -14,15 +12,8 @@ from PIL import Image
 
 MAX_COLLAGE_PAGES = 16
 IMAGES_PER_ROW = 4
-DEFAULT_DPI = 150
-
-
-def collage_path(pdf_path):
-    return pdf_path.with_name(f"{pdf_path.name}.jpg")
-
-
-def frontpage_path(pdf_path):
-    return pdf_path.with_name(f"{pdf_path.name}_frontpage.jpg")
+# 50 dpi keeps a 16 page collage around 0.5 MB while the pages stay recognisable.
+DEFAULT_DPI = 50
 
 
 def render_pages(pdf_path, max_pages=None, dpi=DEFAULT_DPI):
@@ -51,36 +42,42 @@ def make_collage(images, images_per_row=IMAGES_PER_ROW):
     return collage
 
 
-def save_pdf_images(pdf_path, overwrite=False, dpi=DEFAULT_DPI):
-    """Write the collage and front page images for a PDF; return the written paths."""
-    pdf_path = Path(pdf_path)
-    collage, frontpage = collage_path(pdf_path), frontpage_path(pdf_path)
-    todo = [path for path in (collage, frontpage) if overwrite or not path.exists()]
-    if not todo:
-        return []
+def save_collage(pdf_path, collage_path, overwrite=False, dpi=DEFAULT_DPI):
+    """Write the collage for a PDF; return whether it was written."""
+    collage_path = Path(collage_path)
+    if collage_path.exists() and not overwrite:
+        return False
 
     pages = render_pages(pdf_path, MAX_COLLAGE_PAGES, dpi)
     if not pages:
         raise ValueError(f"{pdf_path} has no pages")
-    if collage in todo:
-        make_collage(pages).save(collage)
-    if frontpage in todo:
-        pages[0].save(frontpage)
-    return todo
+    collage_path.parent.mkdir(parents=True, exist_ok=True)
+    make_collage(pages).save(collage_path)
+    return True
 
 
-def process_pdfs(input_dir, overwrite=False, dpi=DEFAULT_DPI):
-    """Render images for every PDF below ``input_dir``.
+def remove_frontpages(layout):
+    """Delete the front page images written by older versions; return how many."""
+    paths = list(layout.articles_dir.glob("*/*.pdf_frontpage.jpg"))
+    for path in paths:
+        path.unlink()
+    return len(paths)
 
-    A broken PDF is reported and skipped. Returns the PDFs that got new images and
-    the PDFs that failed.
+
+def render_collages(layout, overwrite=False, dpi=DEFAULT_DPI):
+    """Render the collage of every article that has a PDF and a folder in the vault.
+
+    A broken PDF is reported and skipped. Returns the keys that got a new collage
+    and the keys that failed.
     """
     rendered, failed = [], []
-    for pdf_path in sorted(Path(input_dir).rglob("*.pdf")):
+    for key in layout.keys_with_pdf():
+        if not layout.folder(key).is_dir():
+            continue
         try:
-            if save_pdf_images(pdf_path, overwrite, dpi):
-                rendered.append(pdf_path)
+            if save_collage(layout.pdf(key), layout.collage(key), overwrite, dpi):
+                rendered.append(key)
         except Exception as error:
-            print(f"Error processing {pdf_path}: {error}", file=sys.stderr)
-            failed.append(pdf_path)
+            print(f"Error processing {layout.pdf(key)}: {error}", file=sys.stderr)
+            failed.append(key)
     return rendered, failed

@@ -159,3 +159,16 @@ def test_add_refuses_to_overwrite_pdf(tmp_path, bib_file, articles_dir, make_pdf
 def test_add_missing_pdf(tmp_path, bib_file, articles_dir):
     with pytest.raises(ObscatError, match="does not exist"):
         add_article(tmp_path / "nope.pdf", bib_file, articles_dir, bibtex=NEW_ENTRY)
+
+
+def test_add_to_external_pdf_folder(tmp_path, bib_file, articles_dir, make_pdf):
+    papers = tmp_path / "papers"
+    key = add_article(
+        make_pdf(tmp_path / "a.pdf"),
+        bib_file,
+        articles_dir,
+        bibtex=NEW_ENTRY,
+        pdf_dir=papers,
+    )
+    assert (papers / f"{key}.pdf").exists()
+    assert not articles_dir.exists()

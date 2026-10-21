@@ -10,6 +10,7 @@ def test_config_set_and_show(tmp_path, bib_file, articles_dir, capsys):
     assert load_config() == {
         "bib_file_path": str(bib_file),
         "article_folder_path": str(articles_dir),
+        "pdf_folder_path": None,
     }
     assert main(["config"]) == 0
     out = capsys.readouterr().out
@@ -53,7 +54,7 @@ def test_images(articles_dir, make_pdf, capsys):
     make_pdf(articles_dir / "key" / "key.pdf")
     assert main(["images", "-a", str(articles_dir), "--dpi", "72"]) == 0
     assert (articles_dir / "key" / "key.pdf.jpg").exists()
-    assert "Rendered images for 1 PDFs" in capsys.readouterr().out
+    assert "Rendered 1 previews" in capsys.readouterr().out
 
 
 def test_images_with_broken_pdf_fails(articles_dir):
@@ -94,3 +95,53 @@ def test_add_no_build(tmp_path, bib_file, articles_dir, make_pdf):
 def test_add_sources_are_mutually_exclusive(tmp_path):
     with pytest.raises(SystemExit):
         main(["add", "x.pdf", "--doi", "10.1/x", "--arxiv", "2101.00001"])
+
+
+def test_external_pdf_folder(tmp_path, bib_file, articles_dir, make_pdf, capsys):
+    papers = tmp_path / "Papers"
+    papers.mkdir()
+    entry = tmp_path / "entry.bib"
+    entry.write_text("@article{new1, title={Brand new}, author={N, N}, year={2024}}")
+    main(["config", "-b", str(bib_file), "-a", str(articles_dir), "-p", str(papers)])
+    assert f"PDF folder:      {papers}" in capsys.readouterr().out
+
+    assert (
+        main(["add", str(make_pdf(tmp_path / "paper.pdf")), "--bibtex", str(entry)])
+        == 0
+    )
+
+    assert (papers / "new1.pdf").exists()
+    assert not (articles_dir / "new1" / "new1.pdf").exists()
+    assert (articles_dir / "new1" / "new1.pdf.jpg").exists()
+    note = (articles_dir / "new1" / "@new1.md").read_text()
+    assert f"pdf: {(papers / 'new1.pdf').as_uri()}" in note
+    assert f"[Open PDF]({(papers / 'new1.pdf').as_uri()})" in note
+
+    assert main(["images"]) == 0
+    assert "Rendered 0 previews" in capsys.readouterr().out
+
+
+def test_move_pdfs_command(tmp_path, bib_file, articles_dir, make_pdf, capsys):
+    papers = tmp_path / "Papers"
+    papers.mkdir()
+    make_pdf(articles_dir / "doe2020gyro" / "doe2020gyro.pdf")
+    main(["config", "-b", str(bib_file), "-a", str(articles_dir)])
+    main(["build"])
+    (articles_dir / "doe2020gyro" / "doe2020gyro.pdf_frontpage.jpg").write_bytes(b"x")
+
+    assert main(["move-pdfs", "-p", str(papers)]) == 0
+
+    assert "Moved 1 PDFs" in capsys.readouterr().out
+    assert (papers / "doe2020gyro.pdf").exists()
+    note = (articles_dir / "doe2020gyro" / "@doe2020gyro.md").read_text()
+    assert f"pdf: {(papers / 'doe2020gyro.pdf').as_uri()}" in note
+    assert "has_pdf: true" in note
+
+    main(["images", "-p", str(papers)])
+    assert "Removed 1 unused front page images" in capsys.readouterr().out
+
+
+def test_move_pdfs_requires_pdf_folder(bib_file, articles_dir, capsys):
+    with pytest.raises(SystemExit):
+        main(["move-pdfs", "-b", str(bib_file), "-a", str(articles_dir)])
+    assert "--pdfs is required" in capsys.readouterr().err

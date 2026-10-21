@@ -7,9 +7,10 @@ For every article in the .bib file a folder ``<articles>/<key>/`` is created wit
   properties that come from the .bib file are updated; properties you add
   yourself are kept.
 - ``<key>.bib``: the BibTeX entry (only written once),
-- ``<key>.html``: a link to the article online (only written once).
+- ``<key>.html``: a link to the article online (only written once),
+- ``<key>.pdf.jpg``: a preview of the first pages (see ``obscat.images``).
 
-The PDF is expected at ``<articles>/<key>/<key>.pdf``. ``<articles>/Articles.base``
+Where the PDF lives is described by ``obscat.layout``. ``<articles>/Articles.base``
 (written once) lists all articles and the ones without a PDF.
 """
 
@@ -21,6 +22,8 @@ import yaml
 from pybtex.database import parse_file
 
 from obscat import ObscatError
+from obscat.layout import Layout
+from obscat.pdfs import pdf_markdown, pdf_property
 from obscat.text import latex_to_text, month_number, safe_filename
 
 ARTICLE_TYPES = ("article", "inproceedings")
@@ -37,6 +40,7 @@ MANAGED_PROPERTIES = (
     "doi",
     "url",
     "citekey",
+    "pdf",
     "has_pdf",
 )
 
@@ -55,8 +59,10 @@ properties:
     displayName: Year
   note.journal:
     displayName: Journal
-  note.has_pdf:
+  note.pdf:
     displayName: PDF
+  note.has_pdf:
+    displayName: Has PDF
   note.url:
     displayName: Link
 views:
@@ -68,7 +74,7 @@ views:
       - authors
       - year
       - journal
-      - has_pdf
+      - pdf
   - type: table
     name: By journal
     groupBy:
@@ -157,8 +163,9 @@ def entry_url(entry):
     return None
 
 
-def entry_properties(key, entry, has_pdf):
+def entry_properties(key, entry, layout):
     """Return the properties set from the .bib file; ``None`` means "remove"."""
+    has_pdf = layout.pdf(key).exists()
     year = entry.fields.get("year", "").strip()
     authors = [safe_filename(name) for name in entry_authors(entry)]
     return {
@@ -170,12 +177,9 @@ def entry_properties(key, entry, has_pdf):
         "doi": entry.fields.get("doi") or None,
         "url": entry_url(entry),
         "citekey": key,
+        "pdf": pdf_property(layout, key) if has_pdf else None,
         "has_pdf": has_pdf,
     }
-
-
-def note_name(key):
-    return f"@{key}.md"
 
 
 def split_frontmatter(text, path):
@@ -223,8 +227,8 @@ def merge_properties(existing, managed):
     return merged
 
 
-def render_body(key, entry, folder, full_path=False, notes=""):
-    prefix = f"{folder}/" if full_path else ""
+def render_body(key, entry, layout, full_path=False, notes=""):
+    prefix = f"{layout.folder(key)}/" if full_path else ""
     lines = [f"# {entry_title(entry)}", "", "## Notes", ""]
     if notes:
         lines += [notes, ""]
@@ -235,7 +239,7 @@ def render_body(key, entry, folder, full_path=False, notes=""):
         "",
         "## Full pdf",
         "",
-        f"![[{prefix}{key}.pdf]]",
+        pdf_markdown(layout, key, prefix),
         "",
         "## Citation",
         "",
@@ -260,7 +264,7 @@ def _remove_legacy_notes(folder, key, keep):
             path.unlink()
 
 
-def _create_note(path, key, entry, properties, full_path):
+def _create_note(path, key, entry, properties, layout, full_path):
     """Write a new note, moving in the contents of an old ``<key>_notes.md``."""
     folder = path.parent
     notes_path = folder / f"{key}_notes.md"
@@ -269,7 +273,7 @@ def _create_note(path, key, entry, properties, full_path):
         text = notes_path.read_text(encoding="utf-8")
         notes_properties, notes = split_frontmatter(text, notes_path)
 
-    body = render_body(key, entry, folder, full_path, notes.strip())
+    body = render_body(key, entry, layout, full_path, notes.strip())
     text = join_frontmatter(merge_properties(notes_properties, properties), body)
     path.write_text(text, encoding="utf-8")
 
@@ -288,18 +292,17 @@ def _update_note(path, properties):
         path.write_text(updated, encoding="utf-8")
 
 
-def write_entry_files(key, entry, output_dir, full_path=False):
+def write_entry_files(key, entry, layout, full_path=False):
     """Create or update the files for one entry and return whether its PDF exists."""
-    folder = Path(output_dir) / key
+    folder = layout.folder(key)
     folder.mkdir(parents=True, exist_ok=True)
-    has_pdf = (folder / f"{key}.pdf").exists()
 
-    path = folder / note_name(key)
-    properties = entry_properties(key, entry, has_pdf)
+    path = layout.note(key)
+    properties = entry_properties(key, entry, layout)
     if path.exists():
         _update_note(path, properties)
     else:
-        _create_note(path, key, entry, properties, full_path)
+        _create_note(path, key, entry, properties, layout, full_path)
 
     html_path = folder / f"{key}.html"
     url = entry_url(entry)
@@ -313,7 +316,7 @@ def write_entry_files(key, entry, output_dir, full_path=False):
     if not bib_path.exists():
         bib_path.write_text(entry.to_string("bibtex"), encoding="utf-8")
 
-    return has_pdf
+    return properties["has_pdf"]
 
 
 def _remove_legacy_files(output_dir):
@@ -324,19 +327,21 @@ def _remove_legacy_files(output_dir):
             print(f"Removed {name}, use {BASE_FILE} instead")
 
 
-def build_catalogue(bib_path, output_dir, full_path=False):
+def build_catalogue(bib_path, output_dir, full_path=False, pdf_dir=None):
     """Create or update all notes and write ``Articles.base`` if it does not exist.
 
-    Returns the catalogued entries and the keys of the entries without a PDF.
+    PDFs are looked for in ``pdf_dir`` if given, otherwise in the vault. Returns the
+    catalogued entries and the keys of the entries without a PDF.
     """
     entries = load_entries(bib_path)
-    output_dir = Path(output_dir)
+    layout = Layout(output_dir, pdf_dir)
+    output_dir = layout.articles_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     missing = [
         key
         for key, entry in entries.items()
-        if not write_entry_files(key, entry, output_dir, full_path)
+        if not write_entry_files(key, entry, layout, full_path)
     ]
 
     base_path = output_dir / BASE_FILE

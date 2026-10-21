@@ -1,4 +1,4 @@
-"""Persistent user configuration: where the .bib file and the articles folder live."""
+"""Persistent user configuration: where the .bib file, articles and PDFs live."""
 
 import os
 from pathlib import Path
@@ -8,7 +8,7 @@ from platformdirs import user_config_path
 
 from obscat import ObscatError
 
-KEYS = ("bib_file_path", "article_folder_path")
+KEYS = ("bib_file_path", "article_folder_path", "pdf_folder_path")
 
 
 def config_path(path=None):
