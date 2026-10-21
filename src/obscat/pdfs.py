@@ -26,6 +26,17 @@ def pdf_markdown(layout, key, prefix=""):
     return f"![[{prefix}{key}.pdf]]"
 
 
+def update_pdf_link(body, layout, key):
+    """Point the generated ``[Open PDF](file://...)`` link at the current PDF folder.
+
+    The rest of the body is left alone, so this only touches the line obscat wrote.
+    """
+    if not layout.external_pdfs:
+        return body
+    link = re.compile(rf"\[Open PDF\]\(file://[^)]*/{re.escape(key)}\.pdf\)")
+    return link.sub(lambda _: pdf_markdown(layout, key), body)
+
+
 def _relink_note(note, key, link):
     """Replace the embedded PDF in a note body by ``link``; return whether it did."""
     text = note.read_text(encoding="utf-8")

@@ -25,7 +25,7 @@ from pybtex.database import parse_file
 
 from obscat import ObscatError
 from obscat.layout import Layout
-from obscat.pdfs import pdf_markdown, pdf_property
+from obscat.pdfs import pdf_markdown, pdf_property, update_pdf_link
 from obscat.text import latex_to_text, month_number, safe_filename
 
 BASE_FILE = "Articles.base"
@@ -290,10 +290,15 @@ def _create_note(path, key, entry, properties, layout, full_path):
     _remove_legacy_notes(folder, key, keep=path.name)
 
 
-def _update_note(path, properties):
-    """Update the properties of an existing note; the body is left alone."""
+def _update_note(path, key, properties, layout):
+    """Update the properties of an existing note.
+
+    The body is left alone, except for the generated link to the PDF, which follows
+    the PDF folder if it moved.
+    """
     text = path.read_text(encoding="utf-8")
     existing, body = split_frontmatter(text, path)
+    body = update_pdf_link(body, layout, key)
     updated = join_frontmatter(merge_properties(existing, properties), body)
     if updated != text:
         path.write_text(updated, encoding="utf-8")
@@ -307,7 +312,7 @@ def write_entry_files(key, entry, layout, full_path=False):
     path = layout.note(key)
     properties = entry_properties(key, entry, layout)
     if path.exists():
-        _update_note(path, properties)
+        _update_note(path, key, properties, layout)
     else:
         _create_note(path, key, entry, properties, layout, full_path)
 

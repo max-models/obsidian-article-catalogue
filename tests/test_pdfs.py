@@ -3,7 +3,7 @@ import pytest
 from obscat import ObscatError
 from obscat.catalogue import build_catalogue
 from obscat.layout import Layout
-from obscat.pdfs import move_pdfs, pdf_markdown, pdf_property
+from obscat.pdfs import move_pdfs, pdf_markdown, pdf_property, update_pdf_link
 
 
 @pytest.fixture
@@ -94,3 +94,31 @@ def test_move_pdfs_only_given_keys(articles_dir, pdf_dir, make_pdf):
     other = make_pdf(articles_dir / "b" / "b.pdf")
     assert move_pdfs(articles_dir, pdf_dir, keys={"a"}) == (["a"], [])
     assert other.exists()
+
+
+def test_rebuild_follows_moved_pdf_folder(tmp_path, bib_file, articles_dir, make_pdf):
+    old, new = tmp_path / "old papers", tmp_path / "Obsidian" / "Papers"
+    make_pdf(old / "doe2020gyro.pdf")
+    build_catalogue(bib_file, articles_dir, pdf_dir=old)
+    note = articles_dir / "doe2020gyro" / "@doe2020gyro.md"
+    note.write_text(
+        note.read_text().replace("## Notes\n", "## Notes\n\nSee [Open PDF] above.\n")
+    )
+
+    new.parent.mkdir()
+    old.rename(new)
+    build_catalogue(bib_file, articles_dir, pdf_dir=new)
+
+    text = note.read_text()
+    assert pdf_markdown(Layout(articles_dir, new), "doe2020gyro") in text
+    assert old.as_uri() not in text
+    assert "See [Open PDF] above." in text
+    assert f"pdf: {(new / 'doe2020gyro.pdf').as_uri()}" in text
+
+
+def test_update_pdf_link_only_touches_its_own_key(tmp_path, articles_dir):
+    layout = Layout(articles_dir, tmp_path / "new")
+    body = "[Open PDF](file:///x/a.pdf)\n[Open PDF](file:///x/b.pdf)\n"
+    updated = update_pdf_link(body, layout, "a")
+    assert pdf_markdown(layout, "a") in updated
+    assert "[Open PDF](file:///x/b.pdf)" in updated

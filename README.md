@@ -116,7 +116,9 @@ title is added as an alias. The note body is only written when the note is
 created. On every `obscat build` the properties that come from the .bib file
 (`title`, `aliases`, `authors`, `year`, `month`, `journal`, `doi`, `url`,
 `citekey`, `type`, `pdf`, `has_pdf`) are updated, and everything else is kept: the body, your
-own properties (e.g. `status`, `tags`) and your own aliases.
+own properties (e.g. `status`, `tags`) and your own aliases. The one exception in
+the body is the generated `[Open PDF](file:///...)` link, which follows the PDF
+folder, so after moving the folder run `obscat config -p NEW` and `obscat build`.
 
 Authors are links (`[[Jane Doe]]`), so creating a note for an author lists all
 of their papers in its backlinks.
