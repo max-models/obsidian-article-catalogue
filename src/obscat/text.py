@@ -1,7 +1,5 @@
 """Turn BibTeX/LaTeX strings into text that is safe to use in Obsidian."""
 
-import re
-
 from pylatexenc.latex2text import LatexNodes2Text
 
 _LATEX = LatexNodes2Text()
@@ -41,11 +39,6 @@ def safe_filename(title):
     text = "".join(char for char in text if char not in _FORBIDDEN_FILENAME_CHARS)
     text = " ".join(text.split())[:_MAX_FILENAME_LENGTH]
     return text.strip(" .")
-
-
-def clean_tag(text):
-    """Convert text into an Obsidian tag part (letters, digits, ``_`` and ``-``)."""
-    return re.sub(r"[^\w-]", "", latex_to_text(text))
 
 
 def month_number(month):

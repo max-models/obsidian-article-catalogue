@@ -3,28 +3,27 @@ import yaml
 
 from obscat import ObscatError
 from obscat.catalogue import (
-    CATALOGUE_FILE,
-    MISSING_FILE,
+    BASE_FILE,
     build_catalogue,
     load_entries,
+    merge_properties,
+    split_frontmatter,
 )
 
-DOE_NOTE = "Gyrokinetic simulations - W7-X and LHD.md"
-SMITH_NOTE = "Fast solvers for α particles.md"
+KEYS = ["doe2020gyro", "smith2019conf", "lee2021arxiv"]
 
 
-def read_frontmatter(path):
-    text = path.read_text(encoding="utf-8")
-    assert text.startswith("---\n")
-    return yaml.safe_load(text.split("---\n")[1])
+def note_path(articles_dir, key):
+    return articles_dir / key / f"@{key}.md"
+
+
+def read_note(articles_dir, key):
+    text = note_path(articles_dir, key).read_text(encoding="utf-8")
+    return split_frontmatter(text, key)
 
 
 def test_load_entries_keeps_articles_papers_and_preprints(bib_file):
-    assert list(load_entries(bib_file)) == [
-        "doe2020gyro",
-        "smith2019conf",
-        "lee2021arxiv",
-    ]
+    assert list(load_entries(bib_file)) == KEYS
 
 
 def test_load_entries_missing_file(tmp_path):
@@ -32,91 +31,130 @@ def test_load_entries_missing_file(tmp_path):
         load_entries(tmp_path / "nope.bib")
 
 
-def test_build_creates_one_folder_per_entry(bib_file, articles_dir):
+def test_build_creates_one_note_per_entry(bib_file, articles_dir):
     entries, missing = build_catalogue(bib_file, articles_dir)
-    assert set(entries) == {"doe2020gyro", "smith2019conf", "lee2021arxiv"}
-    assert missing == list(entries)
-    for key in entries:
+    assert list(entries) == KEYS
+    assert missing == KEYS
+    for key in KEYS:
+        assert note_path(articles_dir, key).is_file()
         assert (articles_dir / key / f"{key}.bib").is_file()
-    assert (articles_dir / "doe2020gyro" / DOE_NOTE).is_file()
-    assert (articles_dir / "smith2019conf" / SMITH_NOTE).is_file()
-    assert (articles_dir / "lee2021arxiv" / "A preprint.md").is_file()
     assert not (articles_dir / "knuth1984").exists()
 
 
-def test_note_frontmatter_is_valid_yaml(bib_file, articles_dir):
+def test_note_properties(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
-    assert read_frontmatter(articles_dir / "doe2020gyro" / DOE_NOTE) == {
+    properties, _ = read_note(articles_dir, "doe2020gyro")
+    assert properties == {
         "title": "Gyrokinetic simulations: W7-X & LHD",
-        "author": "DoeJane",
-        "date": "2020-01",
-        "bibentry": "doe2020gyro",
+        "aliases": ["Gyrokinetic simulations: W7-X & LHD"],
+        "authors": ["[[Jane Doe]]", "[[Hans Müller]]"],
+        "year": 2020,
+        "month": 1,
+        "journal": "Journal of Plasma Physics",
+        "doi": "10.1017/S0022377820000001",
+        "url": "https://doi.org/10.1017/S0022377820000001",
+        "citekey": "doe2020gyro",
+        "has_pdf": False,
     }
-    assert (
-        read_frontmatter(articles_dir / "smith2019conf" / SMITH_NOTE)["date"]
-        == "2019-11"
-    )
 
 
-def test_note_content(bib_file, articles_dir):
+def test_optional_properties_are_left_out(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
-    note = (articles_dir / "doe2020gyro" / DOE_NOTE).read_text(encoding="utf-8")
-    assert (
-        "#Articles/Author/DoeJane #Articles/Year/2020 "
-        "#Articles/Journal/JournalofPlasmaPhysics"
-    ) in note
-    assert "Authors: [[DoeJane]], [[MüllerHans]]" in note
-    assert "![[doe2020gyro_notes.md]]" in note
-    assert "![[doe2020gyro.pdf.jpg]]" in note
-    assert "![[doe2020gyro.pdf]]" in note
-    assert "@article{doe2020gyro," in note
+    properties, _ = read_note(articles_dir, "lee2021arxiv")
+    assert properties["journal"] == "arXiv"
+    assert "month" not in properties
+    assert "doi" not in properties
+    assert "url" not in properties
 
 
-def test_booktitle_and_arxiv_used_as_venue(bib_file, articles_dir):
+def test_booktitle_is_used_as_journal(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
-    smith = (articles_dir / "smith2019conf" / SMITH_NOTE).read_text(encoding="utf-8")
-    assert "#Articles/Journal/ProceedingsoftheAPSDPP" in smith
-    lee = (articles_dir / "lee2021arxiv" / "A preprint.md").read_text(encoding="utf-8")
-    assert "#Articles/Journal/arXiv" in lee
+    properties, _ = read_note(articles_dir, "smith2019conf")
+    assert properties["journal"] == "Proceedings of the APS DPP"
+    assert properties["month"] == 11
+    assert properties["url"] == "https://example.org/paper/one"
 
 
-def test_full_path_links(bib_file, articles_dir):
+def test_note_body(bib_file, articles_dir):
+    build_catalogue(bib_file, articles_dir)
+    _, body = read_note(articles_dir, "doe2020gyro")
+    assert body.startswith("# Gyrokinetic simulations: W7-X & LHD\n\n## Notes\n")
+    assert "![[doe2020gyro.pdf.jpg]]" in body
+    assert "![[doe2020gyro.pdf]]" in body
+    assert "@article{doe2020gyro," in body
+
+
+def test_full_path_embeds(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir, full_path=True)
-    folder = articles_dir / "doe2020gyro"
-    note = (folder / DOE_NOTE).read_text(encoding="utf-8")
-    assert f"![[{folder}/doe2020gyro.pdf]]" in note
-    table = (articles_dir / CATALOGUE_FILE).read_text(encoding="utf-8")
-    assert f"(<{folder / DOE_NOTE}>)" in table
+    _, body = read_note(articles_dir, "doe2020gyro")
+    assert f"![[{articles_dir / 'doe2020gyro'}/doe2020gyro.pdf]]" in body
 
 
-def test_html_link(bib_file, articles_dir):
+def test_rebuild_keeps_body_and_user_properties(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
-    doe = (articles_dir / "doe2020gyro" / "doe2020gyro.html").read_text()
-    assert 'href="https://doi.org/10.1017/S0022377820000001"' in doe
-    smith = (articles_dir / "smith2019conf" / "smith2019conf.html").read_text()
-    assert 'href="https://example.org/paper/one"' in smith
-    assert not (articles_dir / "lee2021arxiv" / "lee2021arxiv.html").exists()
+    path = note_path(articles_dir, "doe2020gyro")
+    properties, body = split_frontmatter(path.read_text(), path)
+    properties["status"] = "read"
+    properties["tags"] = ["gyrokinetics"]
+    properties["has_pdf"] = True  # wrong on purpose, the build corrects it
+    body = body.replace("## Notes\n", "## Notes\n\nVery good paper.\n")
+    path.write_text("---\n" + yaml.safe_dump(properties) + "---\n" + body)
 
-
-def test_catalogue_table(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
-    lines = (articles_dir / CATALOGUE_FILE).read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "| Article Name | First Author | Year | Journal |"
-    assert lines[2] == (
-        f"| [[{DOE_NOTE}]] | Doe, Jane | 2020 | Journal of Plasma Physics |"
+
+    properties, new_body = read_note(articles_dir, "doe2020gyro")
+    assert new_body == body
+    assert properties["status"] == "read"
+    assert properties["tags"] == ["gyrokinetics"]
+    assert properties["has_pdf"] is False
+    assert list(properties)[:2] == ["title", "aliases"]
+
+
+def test_rebuild_updates_changed_bib_fields(bib_file, articles_dir):
+    build_catalogue(bib_file, articles_dir)
+    bib_file.write_text(
+        bib_file.read_text()
+        .replace("simulations:", "studies:")
+        .replace("  doi = {10.1017/S0022377820000001},\n", "")
     )
-    assert len(lines) == 5
+    build_catalogue(bib_file, articles_dir)
+    properties, _ = read_note(articles_dir, "doe2020gyro")
+    assert properties["title"] == "Gyrokinetic studies: W7-X & LHD"
+    assert properties["aliases"] == ["Gyrokinetic studies: W7-X & LHD"]
+    assert "doi" not in properties
 
 
-def test_missing_articles_lists_only_entries_without_pdf(bib_file, articles_dir):
+def test_has_pdf(bib_file, articles_dir):
     (articles_dir / "doe2020gyro").mkdir(parents=True)
     (articles_dir / "doe2020gyro" / "doe2020gyro.pdf").write_bytes(b"%PDF")
     _, missing = build_catalogue(bib_file, articles_dir)
     assert missing == ["smith2019conf", "lee2021arxiv"]
-    text = (articles_dir / MISSING_FILE).read_text(encoding="utf-8")
-    assert "doe2020gyro" not in text
-    assert "- [smith2019conf](https://example.org/paper/one) | [Folder](<" in text
-    assert "- lee2021arxiv | [Folder](<" in text
+    assert read_note(articles_dir, "doe2020gyro")[0]["has_pdf"] is True
+
+
+def test_invalid_user_properties_are_not_overwritten(bib_file, articles_dir):
+    build_catalogue(bib_file, articles_dir)
+    path = note_path(articles_dir, "doe2020gyro")
+    path.write_text("---\ntitle: [unclosed\n---\nmy notes")
+    with pytest.raises(ObscatError, match="Could not read the properties"):
+        build_catalogue(bib_file, articles_dir)
+    assert path.read_text() == "---\ntitle: [unclosed\n---\nmy notes"
+
+
+def test_base_file_is_written_once(bib_file, articles_dir):
+    build_catalogue(bib_file, articles_dir)
+    base = articles_dir / BASE_FILE
+    content = yaml.safe_load(base.read_text())
+    assert content["filters"] == {"and": ['file.hasProperty("citekey")']}
+    assert [view["name"] for view in content["views"]] == [
+        "All articles",
+        "By journal",
+        "Missing PDF",
+    ]
+
+    base.write_text("my customised views")
+    build_catalogue(bib_file, articles_dir)
+    assert base.read_text() == "my customised views"
 
 
 def test_existing_bib_and_html_are_not_overwritten(bib_file, articles_dir):
@@ -129,25 +167,6 @@ def test_existing_bib_and_html_are_not_overwritten(bib_file, articles_dir):
     assert (folder / "doe2020gyro.html").read_text() == "my link"
 
 
-def test_renamed_title_removes_old_note_but_keeps_user_notes(bib_file, articles_dir):
-    folder = articles_dir / "doe2020gyro"
-    folder.mkdir(parents=True)
-    # A note generated by an older version: unquoted, invalid YAML title.
-    old = folder / "Old title.md"
-    old.write_text("---\ntitle: Old: title\nbibentry: doe2020gyro\n---\nbody")
-    other = folder / "Other entry.md"
-    other.write_text("---\nbibentry: someoneelse\n---\n")
-    notes = folder / "doe2020gyro_notes.md"
-    notes.write_text("my notes")
-
-    build_catalogue(bib_file, articles_dir)
-
-    assert not old.exists()
-    assert other.exists()
-    assert notes.read_text() == "my notes"
-    assert (folder / DOE_NOTE).exists()
-
-
 def test_build_is_idempotent(bib_file, articles_dir):
     build_catalogue(bib_file, articles_dir)
     first = {p: p.read_bytes() for p in articles_dir.rglob("*") if p.is_file()}
@@ -156,8 +175,65 @@ def test_build_is_idempotent(bib_file, articles_dir):
     assert first == second
 
 
-def test_entry_without_title_uses_key(tmp_path, articles_dir):
+def test_migrates_old_layout(bib_file, articles_dir):
+    folder = articles_dir / "doe2020gyro"
+    folder.mkdir(parents=True)
+    # A note generated by an older version: named after the title, invalid YAML.
+    old_note = folder / "Gyrokinetic simulations - W7-X and LHD.md"
+    old_note.write_text("---\ntitle: Old: title\nbibentry: doe2020gyro\n---\nbody")
+    unrelated = folder / "Unrelated.md"
+    unrelated.write_text("---\nbibentry: someoneelse\n---\n")
+    user_notes = folder / "doe2020gyro_notes.md"
+    user_notes.write_text("---\nstatus: read\n---\nMy notes with a [[link]].\n")
+    (articles_dir / "article_catalogue.md").write_text("| Article Name | ... |\n")
+    (articles_dir / "Missing articles.md").write_text("# Missing articles\n")
+
+    build_catalogue(bib_file, articles_dir)
+
+    assert not old_note.exists()
+    assert not user_notes.exists()
+    assert unrelated.exists()
+    assert not (articles_dir / "article_catalogue.md").exists()
+    assert not (articles_dir / "Missing articles.md").exists()
+    properties, body = read_note(articles_dir, "doe2020gyro")
+    assert properties["status"] == "read"
+    assert "## Notes\n\nMy notes with a [[link]].\n\n## Summary" in body
+
+
+def test_legacy_files_with_other_content_are_kept(bib_file, articles_dir):
+    articles_dir.mkdir()
+    (articles_dir / "article_catalogue.md").write_text("my own file")
+    build_catalogue(bib_file, articles_dir)
+    assert (articles_dir / "article_catalogue.md").exists()
+
+
+def test_entry_without_title(tmp_path, articles_dir):
     bib = tmp_path / "refs.bib"
     bib.write_text("@article{notitle, author={A, B}, journal={J}, year={2000}}")
     build_catalogue(bib, articles_dir)
-    assert (articles_dir / "notitle" / "notitle.md").is_file()
+    properties, _ = read_note(articles_dir, "notitle")
+    assert properties["title"] == "Unknown Title"
+
+
+@pytest.mark.parametrize(
+    ("text", "properties", "body"),
+    [
+        ("no frontmatter", {}, "no frontmatter"),
+        ("---\n---\nbody", {}, "body"),
+        ("---\na: 1\n---\nbody\n---\nmore", {"a": 1}, "body\n---\nmore"),
+        ("---\na: 1\n---", {"a": 1}, ""),
+    ],
+)
+def test_split_frontmatter(text, properties, body):
+    assert split_frontmatter(text, "note.md") == (properties, body)
+
+
+def test_merge_properties_keeps_user_aliases():
+    existing = {"title": "Old", "aliases": ["Old", "Nickname"], "rating": 5}
+    managed = {"title": "New", "citekey": "k", "doi": None}
+    assert merge_properties(existing, managed) == {
+        "title": "New",
+        "aliases": ["New", "Nickname"],
+        "citekey": "k",
+        "rating": 5,
+    }

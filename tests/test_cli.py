@@ -1,6 +1,6 @@
 import pytest
 
-from obscat.catalogue import CATALOGUE_FILE
+from obscat.catalogue import BASE_FILE
 from obscat.cli import main
 from obscat.config import load_config
 
@@ -26,13 +26,13 @@ def test_config_option_selects_file(tmp_path, bib_file):
 def test_build_uses_config(bib_file, articles_dir, capsys):
     main(["config", "-b", str(bib_file), "-a", str(articles_dir)])
     assert main(["build"]) == 0
-    assert (articles_dir / CATALOGUE_FILE).exists()
+    assert (articles_dir / "doe2020gyro" / "@doe2020gyro.md").exists()
     assert "Wrote 3 notes" in capsys.readouterr().out
 
 
 def test_build_with_explicit_paths(bib_file, articles_dir):
     assert main(["build", "-b", str(bib_file), "-a", str(articles_dir)]) == 0
-    assert (articles_dir / CATALOGUE_FILE).exists()
+    assert (articles_dir / "doe2020gyro" / "@doe2020gyro.md").exists()
 
 
 def test_build_without_paths_is_a_usage_error(capsys):
@@ -72,9 +72,9 @@ def test_add_builds_catalogue(tmp_path, bib_file, articles_dir, make_pdf):
 
     folder = articles_dir / "new1"
     assert (folder / "new1.pdf").exists()
-    assert (folder / "Brand new.md").exists()
+    assert (folder / "@new1.md").exists()
     assert (folder / "new1.pdf.jpg").exists()
-    assert "Brand new" in (articles_dir / CATALOGUE_FILE).read_text()
+    assert (articles_dir / BASE_FILE).exists()
 
 
 def test_add_no_build(tmp_path, bib_file, articles_dir, make_pdf):
@@ -88,7 +88,7 @@ def test_add_no_build(tmp_path, bib_file, articles_dir, make_pdf):
         "--no-build",
     ]
     assert main([*args, "-b", str(bib_file), "-a", str(articles_dir)]) == 0
-    assert not (articles_dir / CATALOGUE_FILE).exists()
+    assert not (articles_dir / "new1" / "@new1.md").exists()
 
 
 def test_add_sources_are_mutually_exclusive(tmp_path):

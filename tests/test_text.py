@@ -1,6 +1,6 @@
 import pytest
 
-from obscat.text import clean_tag, latex_to_text, month_number, safe_filename
+from obscat.text import latex_to_text, month_number, safe_filename
 
 
 @pytest.mark.parametrize(
@@ -39,20 +39,6 @@ def test_safe_filename_removes_forbidden_characters(char):
 
 def test_safe_filename_is_truncated():
     assert len(safe_filename("word " * 100)) <= 150
-
-
-@pytest.mark.parametrize(
-    ("text", "tag"),
-    [
-        ("Doe, Jane", "DoeJane"),
-        (r"M{\"u}ller, Hans", "MüllerHans"),
-        ("J. Comput. Phys.", "JComputPhys"),
-        ("Plasma Phys. Control. Fusion (UK)", "PlasmaPhysControlFusionUK"),
-        ("Smith-Jones", "Smith-Jones"),
-    ],
-)
-def test_clean_tag(text, tag):
-    assert clean_tag(text) == tag
 
 
 @pytest.mark.parametrize(

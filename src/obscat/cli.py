@@ -8,7 +8,7 @@ from pybtex.exceptions import PybtexError
 
 from obscat import ObscatError, __version__
 from obscat.articles import add_article
-from obscat.catalogue import MISSING_FILE, build_catalogue
+from obscat.catalogue import BASE_FILE, build_catalogue
 from obscat.config import config_path, load_config, save_config
 from obscat.images import DEFAULT_DPI, process_pdfs, save_pdf_images
 
@@ -55,7 +55,7 @@ def _cmd_build(args, config, parser):
     entries, missing = build_catalogue(bib, articles, args.full_path)
     print(f"Wrote {len(entries)} notes to {articles}")
     if missing:
-        print(f"{len(missing)} articles have no PDF, see '{MISSING_FILE}'")
+        print(f"{len(missing)} articles have no PDF, see {BASE_FILE}")
 
 
 def _cmd_images(args, config, parser):
@@ -121,7 +121,7 @@ def build_parser():
     config.set_defaults(func=_cmd_config)
 
     build = commands.add_parser(
-        "build", help="Generate the notes, catalogue table and list of missing PDFs"
+        "build", help="Create or update the notes for all articles in the .bib file"
     )
     _add_path_options(build)
     build.add_argument(
