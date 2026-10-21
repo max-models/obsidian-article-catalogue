@@ -87,3 +87,10 @@ def test_move_pdfs_reports_edited_notes(articles_dir, pdf_dir, make_pdf, capsys)
 def test_move_pdfs_needs_existing_folder(tmp_path, articles_dir):
     with pytest.raises(ObscatError, match="does not exist"):
         move_pdfs(articles_dir, tmp_path / "nope")
+
+
+def test_move_pdfs_only_given_keys(articles_dir, pdf_dir, make_pdf):
+    make_pdf(articles_dir / "a" / "a.pdf")
+    other = make_pdf(articles_dir / "b" / "b.pdf")
+    assert move_pdfs(articles_dir, pdf_dir, keys={"a"}) == (["a"], [])
+    assert other.exists()

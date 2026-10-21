@@ -253,3 +253,13 @@ def test_merge_properties_keeps_user_aliases():
         "citekey": "k",
         "rating": 5,
     }
+
+
+def test_duplicate_fields_are_a_warning(tmp_path, articles_dir, capsys):
+    bib = tmp_path / "refs.bib"
+    bib.write_text("@article{dup, title={T}, issn={1}, issn={1}, year={2000}}")
+    entries, _ = build_catalogue(bib, articles_dir)
+    assert list(entries) == ["dup"]
+    assert "Warning: refs.bib: entry with key dup has a duplicate issn field" in (
+        capsys.readouterr().err
+    )

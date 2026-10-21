@@ -125,6 +125,7 @@ def test_move_pdfs_command(tmp_path, bib_file, articles_dir, make_pdf, capsys):
     papers = tmp_path / "Papers"
     papers.mkdir()
     make_pdf(articles_dir / "doe2020gyro" / "doe2020gyro.pdf")
+    not_in_bib = make_pdf(articles_dir / "various" / "various.pdf")
     main(["config", "-b", str(bib_file), "-a", str(articles_dir)])
     main(["build"])
     (articles_dir / "doe2020gyro" / "doe2020gyro.pdf_frontpage.jpg").write_bytes(b"x")
@@ -133,6 +134,7 @@ def test_move_pdfs_command(tmp_path, bib_file, articles_dir, make_pdf, capsys):
 
     assert "Moved 1 PDFs" in capsys.readouterr().out
     assert (papers / "doe2020gyro.pdf").exists()
+    assert not_in_bib.exists()
     note = (articles_dir / "doe2020gyro" / "@doe2020gyro.md").read_text()
     assert f"pdf: {(papers / 'doe2020gyro.pdf').as_uri()}" in note
     assert "has_pdf: true" in note

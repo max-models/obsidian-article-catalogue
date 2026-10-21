@@ -36,8 +36,11 @@ def _relink_note(note, key, link):
     return bool(count)
 
 
-def move_pdfs(articles_dir, pdf_dir):
+def move_pdfs(articles_dir, pdf_dir, keys=None):
     """Move ``<articles>/<key>/<key>.pdf`` to ``<pdf_dir>/<key>.pdf``.
+
+    Only the PDFs of ``keys`` are moved if given (e.g. the entries of the .bib
+    file), so folders obscat doesn't manage are left alone.
 
     The embedded PDF in each note is replaced by a link to the new location. A PDF
     is not moved if a different file with the same name already exists in
@@ -49,6 +52,8 @@ def move_pdfs(articles_dir, pdf_dir):
 
     moved, skipped = [], []
     for key in vault.keys_with_pdf():
+        if keys is not None and key not in keys:
+            continue
         source, target = vault.pdf(key), external.pdf(key)
         if target.exists():
             if not filecmp.cmp(source, target, shallow=False):

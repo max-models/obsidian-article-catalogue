@@ -8,7 +8,7 @@ from pybtex.exceptions import PybtexError
 
 from obscat import ObscatError, __version__
 from obscat.articles import add_article
-from obscat.catalogue import BASE_FILE, build_catalogue
+from obscat.catalogue import BASE_FILE, build_catalogue, load_entries
 from obscat.config import config_path, load_config, save_config
 from obscat.images import DEFAULT_DPI, remove_frontpages, render_collages, save_collage
 from obscat.layout import Layout
@@ -99,7 +99,7 @@ def _cmd_move_pdfs(args, config, parser):
         parser, args.articles, config["article_folder_path"], "--articles"
     )
     pdf_dir = _resolve(parser, args.pdfs, config["pdf_folder_path"], "--pdfs")
-    moved, skipped = move_pdfs(articles, pdf_dir)
+    moved, skipped = move_pdfs(articles, pdf_dir, keys=load_entries(bib))
     print(f"Moved {len(moved)} PDFs to {pdf_dir}")
     build_catalogue(bib, articles, pdf_dir=pdf_dir)
     return 1 if skipped else 0

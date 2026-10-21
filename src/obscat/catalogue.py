@@ -15,9 +15,11 @@ Where the PDF lives is described by ``obscat.layout``. ``<articles>/Articles.bas
 """
 
 import re
+import sys
 from pathlib import Path
 from urllib.parse import unquote
 
+import pybtex.errors
 import yaml
 from pybtex.database import parse_file
 
@@ -120,13 +122,26 @@ def is_catalogued(entry):
     )
 
 
-def load_entries(bib_path):
-    """Return the catalogued entries of a .bib file, keyed by citation key."""
+def read_bib(bib_path):
+    """Return all entries of a .bib file.
+
+    Problems that don't prevent reading an entry, such as a duplicate field, are
+    printed as warnings instead of failing.
+    """
     bib_path = Path(bib_path)
     if not bib_path.is_file():
         raise ObscatError(f"BibTeX file {bib_path} does not exist")
-    data = parse_file(str(bib_path), bib_format="bibtex")
-    return {key: entry for key, entry in data.entries.items() if is_catalogued(entry)}
+    with pybtex.errors.capture() as problems:
+        data = parse_file(str(bib_path), bib_format="bibtex")
+    for problem in problems:
+        print(f"Warning: {bib_path.name}: {problem}", file=sys.stderr)
+    return data.entries
+
+
+def load_entries(bib_path):
+    """Return the catalogued entries of a .bib file, keyed by citation key."""
+    entries = read_bib(bib_path)
+    return {key: entry for key, entry in entries.items() if is_catalogued(entry)}
 
 
 def entry_title(entry):

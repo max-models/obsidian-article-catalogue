@@ -8,9 +8,10 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 import pymupdf
-from pybtex.database import BibliographyData, parse_file, parse_string
+from pybtex.database import BibliographyData, parse_string
 
 from obscat import ObscatError
+from obscat.catalogue import read_bib
 from obscat.layout import Layout
 
 # Crossref's recommended pattern, see https://www.crossref.org/blog/dois-and-matching-regular-expressions/
@@ -122,7 +123,7 @@ def add_article(
     key = key or entry_key
     entry.key = key
 
-    existing = parse_file(str(bib_path)).entries if bib_path.exists() else {}
+    existing = read_bib(bib_path) if bib_path.exists() else {}
     if key in existing:
         raise ObscatError(f"{bib_path} already contains an entry with key {key}")
     if new_doi := entry.fields.get("doi", "").lower():
