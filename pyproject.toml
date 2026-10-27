@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff"]
+dev = ["pre-commit", "pytest", "ruff"]
 
 [project.urls]
 "Source" = "https://github.com/max-models/obsidian-article-catalogue"
